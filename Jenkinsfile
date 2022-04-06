@@ -1,69 +1,100 @@
 properties([
     parameters([
         booleanParam(name: 'DEPLOY_DEV', defaultValue: false, description: 'Should this build be deployed to DEV?'),
+        booleanParam(name: 'DEPLOY_TEST', defaultValue: false, description: 'Should this build be deployed to TEST?'),
         booleanParam(name: 'DEPLOY_PROD', defaultValue: false, description: 'Should this build be deployed to PROD?')
     ]),
     disableConcurrentBuilds() // This limits build concurrency to 1 per branch
 ])
 
-pipeline {
-    agent any
-    environment {
-        // "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
-        STAGE_NAME = "${env.BRANCH_NAME}" 
-    }
-    tools {nodejs "Node 14.x"}    
-    stages {
-        
-        stage('Git') {
-            steps {
+node {
+    checkout scm
+        docker.image('node:14-alpine').withRun() {
+        try {
+            def stageName = "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
+
+            stage('Checkout') {
                 checkout scm
             }
-        }
-        
-        stage('Install') {
-            steps {
-                sh 'HUSKY_SKIP_INSTALL=1 npm ci'
+
+            stage('Install') {
+                sh "HUSKY_SKIP_INSTALL=1 npm ci"
             }
-        }    
-                
-        stage('Lint and Test') {
-            steps {
+
+            stage('Testing') {
                 parallel Lint: {
-                    sh "npm run lint:check -- -f checkstyle -o checkstyle-result.xml"
+                    try {
+                        sh "npm run lint:check -- -f checkstyle -o checkstyle-result.xml"
+                    } finally {
+                        step([$class: 'hudson.plugins.checkstyle.CheckStylePublisher',
+                            checkstyle: 'checkstyle-result.xml', canRunOnFailed:true])
+                    }
                 }, UnitTests: {
-                    sh 'JEST_JUNIT_OUTPUT=./jest-test-results.xml CI=true npm test -- --ci --reporters=default --reporters=jest-junit --coverage'
+                    try {
+                        sh 'JEST_JUNIT_OUTPUT=./jest-test-results.xml CI=true npm test -- --ci --reporters=default --reporters=jest-junit --coverage'
+                    } finally {
+                        junit 'jest-test-results.xml'
+                        step([$class: 'hudson.plugins.checkstyle.CheckStylePublisher',
+                            checkstyle: 'checkstyle-result.xml', canRunOnFailed:true])
+                    }
                 }
             }
+
+            stage('Build') {
+                buildPackage(stageName)
+            }
+
+            stage('Deploy (Development Environment') {
+                if (env.FU_DEPLOY_DEV == 'TRUE' && (env.BRANCH_NAME == 'master' || params.DEPLOY_DEV == true)) {
+                    deployTo('/usr/local/bin/assume_dev.sh', stageName, 'dev')
+                }
+            }
+
+            stage('Deploy (Testing Environment') {
+                if (env.FU_DEPLOY_TEST == 'TRUE' && (env.BRANCH_NAME == 'master' && params.DEPLOY_TEST == true)) {
+                    deployTo('/usr/local/bin/assume_test.sh', stageName, 'test')
+                }
+            }
+
+            //only deploy master branch to production and require manual build trigger
+            stage('Deploy (Production Environment') {
+                if (env.FU_DEPLOY_PROD == 'TRUE' && (env.BRANCH_NAME == 'master' && params.DEPLOY_PROD == true)) {
+                    deployTo('/usr/local/bin/assume_prod.sh', stageName, 'prod')
+                }
+            }
+
+            echo "Success, with result: ${currentBuild.result}"
+
+        } catch(e) {
+            currentBuild.result = "FAILURE"
+            notifyFailure()
         }
+    }
+}
 
-        stage('Build') {
-            steps {       
-                echo "Branch name: ${env.BRANCH_NAME}"
-                sh "npm run sls:package -- -v -s ${env.BRANCH_NAME} --env dev"
-            }
-        }  
+def buildPackage(def stageName) {
+    // sh """
+    //     . /usr/local/bin/assume_dev.sh
+    //     npm run sls:package -- -v -s ${stageName} --env dev
+    // """
+    sh "npm run sls:package -- -v -s ${stageName} --env dev"
+}
 
-        stage('Deploy (Development Environment') {
-            when {
-                expression {
-                    env.BRANCH_NAME == 'main' || params.DEPLOY_DEV == true
-                }
-            }            
-            steps {
-                sh "npm run sls:deploy -- -v -s ${env.BRANCH_NAME} --env dev --force"
-            }
-        }  
+def deployTo(assume, def stageName, def env) {
+    // sh """
+    //     . ${assume}
+    //     npm run sls:deploy -- -v -s ${stageName} --env ${env} --force
+    // """
+    sh "npm run sls:deploy -- -v -s ${stageName} --env ${env} --force"
+}
 
-        stage('Deploy (Production Environment') {
-            when {
-                expression {
-                    env.BRANCH_NAME == 'main' || params.DEPLOY_DEV == true
-                }
-            }            
-            steps {
-                echo 'Deploying to production'
-            }
-        }                    
+def notifyFailure() {
+    echo "Build failed, with result: ${currentBuild.result}"
+
+    if (env.BRANCH_NAME == 'master') {
+        slackSend(
+                color: '#FFFF00',
+                message: "${currentBuild.result}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' by ${env.CHANGE_AUTHOR_EMAIL} (${env.BUILD_URL})")
+
     }
 }

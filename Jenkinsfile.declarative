@@ -1,3 +1,11 @@
+properties([
+    parameters([
+        booleanParam(name: 'DEPLOY_DEV', defaultValue: false, description: 'Should this build be deployed to DEV?'),
+        booleanParam(name: 'DEPLOY_PROD', defaultValue: false, description: 'Should this build be deployed to PROD?')
+    ]),
+    disableConcurrentBuilds() // This limits build concurrency to 1 per branch
+])
+
 pipeline {
     agent any
     environment {
@@ -31,9 +39,31 @@ pipeline {
 
         stage('Build') {
             steps {       
-                echo "Stage name: ${STAGE_NAME}"
-                sh "npm run sls:package -- -v -s ${STAGE_NAME} --env dev"
+                echo "Branch name: ${env.BRANCH_NAME}"
+                sh "npm run sls:package -- -v -s ${env.BRANCH_NAME} --env dev"
             }
-        }        
+        }  
+
+        stage('Deploy (Development Environment') {
+            when {
+                expression {
+                    env.BRANCH_NAME == 'main' || params.DEPLOY_DEV == true
+                }
+            }            
+            steps {
+                sh "npm run sls:deploy -- -v -s ${env.BRANCH_NAME} --env dev --force"
+            }
+        }  
+
+        stage('Deploy (Production Environment') {
+            when {
+                expression {
+                    env.BRANCH_NAME == 'main' || params.DEPLOY_DEV == true
+                }
+            }            
+            steps {
+                echo 'Deploying to production'
+            }
+        }                    
     }
 }
