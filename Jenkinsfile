@@ -1,7 +1,8 @@
 pipeline {
     agent any
     environment {
-        STAGE_NAME = "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
+        // "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
+        STAGE_NAME = "${env.BRANCH_NAME}" 
     }
     tools {nodejs "Node 14.x"}    
     stages {
