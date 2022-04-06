@@ -1,8 +1,9 @@
 pipeline {
     agent any
-
-    tools {nodejs "Node 14.x"}
-    
+    environment {
+        STAGE_NAME = "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
+    }
+    tools {nodejs "Node 14.x"}    
     stages {
         
         stage('Git') {
@@ -29,14 +30,12 @@ pipeline {
 
         stage('Build') {
             steps {       
-                echo stageName         
-                buildPackage(stageName)
+                echo 'Stage name: ${STAGE_NAME}'         
+                buildPackage(ENV_NAME)
             }
         }        
     }
 }
-
-def stageName = "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
 
 def buildPackage(def stageName) {
     sh """
