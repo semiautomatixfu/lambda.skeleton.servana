@@ -1,7 +1,6 @@
 properties([
     parameters([
         booleanParam(name: 'DEPLOY_DEV', defaultValue: false, description: 'Should this build be deployed to DEV?'),
-        booleanParam(name: 'DEPLOY_TEST', defaultValue: false, description: 'Should this build be deployed to TEST?'),
         booleanParam(name: 'DEPLOY_PROD', defaultValue: false, description: 'Should this build be deployed to PROD?')
     ]),
     disableConcurrentBuilds() // This limits build concurrency to 1 per branch
@@ -9,7 +8,7 @@ properties([
 
 node {
     checkout scm
-        docker.image('node:14-alpine').withRun() {
+    docker.image('node:14-alpine').inside() {
         try {
             def stageName = "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
 
