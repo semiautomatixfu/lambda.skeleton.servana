@@ -1,32 +1,26 @@
 pipeline {
-    agent {
-        docker { image 'node:16.13.1-alpine' }
-    }
+    agent any
+
+    tools {nodejs "Node 14.x"}
     
-  tools {nodejs "Node 14.x"}
-    
-  stages {
+    stages {
         
-    stage('Git') {
-      steps {
-        checkout scm
-      }
-    }
-     
-    stage('Install') {
-        steps {
-            nodejs(nodeJSInstallationName: 'Node 14.x') {
-                sh 'HUSKY_SKIP_INSTALL=1 npm ci'
+        stage('Git') {
+            steps {
+                checkout scm
             }
         }
-    }    
-            
-    stage('Test') {
-        steps {
-            nodejs(nodeJSInstallationName: 'Node 14.x') {
+        
+        stage('Install') {
+            steps {
+                sh 'HUSKY_SKIP_INSTALL=1 npm ci'
+            }
+        }    
+                
+        stage('Test') {
+            steps {
                 sh 'node test'
             }
         }
     }
-  }
 }
