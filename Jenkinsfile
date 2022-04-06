@@ -32,7 +32,7 @@ pipeline {
         stage('Build') {
             steps {       
                 echo 'Stage name: ${STAGE_NAME}'         
-                buildPackage(ENV_NAME)
+                buildPackage(STAGE_NAME)
             }
         }        
     }
