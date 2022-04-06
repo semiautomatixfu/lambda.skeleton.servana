@@ -20,32 +20,23 @@ pipeline {
         stage('Lint and Test') {
             steps {
                 parallel Lint: {
-                    try {
-                        sh "npm run lint:check -- -f checkstyle -o checkstyle-result.xml"
-                    } finally {
-                        step([$class: 'hudson.plugins.checkstyle.CheckStylePublisher',
-                            checkstyle: 'checkstyle-result.xml', canRunOnFailed:true])
-                    }
+                    sh "npm run lint:check -- -f checkstyle -o checkstyle-result.xml"
                 }, UnitTests: {
-                    try {
-                        sh 'JEST_JUNIT_OUTPUT=./jest-test-results.xml CI=true npm test -- --ci --reporters=default --reporters=jest-junit --coverage'
-                    } finally {
-                        junit 'jest-test-results.xml'
-                        step([$class: 'hudson.plugins.checkstyle.CheckStylePublisher',
-                            checkstyle: 'checkstyle-result.xml', canRunOnFailed:true])
-                    }
+                    sh 'JEST_JUNIT_OUTPUT=./jest-test-results.xml CI=true npm test -- --ci --reporters=default --reporters=jest-junit --coverage'
                 }
             }
         }
 
         stage('Build') {
-            steps {
-                def stageName = "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
+            steps {       
+                echo stageName         
                 buildPackage(stageName)
             }
         }        
     }
 }
+
+def stageName = "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
 
 def buildPackage(def stageName) {
     sh """
