@@ -13,14 +13,18 @@ pipeline {
      
     stage('Install') {
         steps {
-            sh 'HUSKY_SKIP_INSTALL=1 npm ci'
+            nodejs() {
+                sh 'HUSKY_SKIP_INSTALL=1 npm ci'
+            }
         }
     }    
             
     stage('Test') {
-      steps {
-        sh 'node test'
-      }
+        nodejs() {
+            steps {
+                sh 'node test'
+            }
+        }
     }
   }
 }
