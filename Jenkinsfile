@@ -12,7 +12,9 @@ pipeline {
     }
      
     stage('Install') {
-        sh 'HUSKY_SKIP_INSTALL=1 npm ci'
+        steps {
+            sh 'HUSKY_SKIP_INSTALL=1 npm ci'
+        }
     }    
             
     stage('Test') {
