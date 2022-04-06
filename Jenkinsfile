@@ -31,16 +31,9 @@ pipeline {
 
         stage('Build') {
             steps {       
-                echo 'Stage name: ${STAGE_NAME}'         
-                buildPackage(STAGE_NAME)
+                echo "Stage name: ${STAGE_NAME}"
+                sh "npm run sls:package -- -v -s ${STAGE_NAME} --env dev"
             }
         }        
     }
-}
-
-def buildPackage(def stageName) {
-    sh """
-        . /usr/local/bin/assume_dev.sh
-        npm run sls:package -- -v -s ${stageName} --env dev
-    """
 }
