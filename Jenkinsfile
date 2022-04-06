@@ -13,15 +13,15 @@ pipeline {
      
     stage('Install') {
         steps {
-            nodejs() {
+            nodejs(nodeJSInstallationName: 'Node 14.x') {
                 sh 'HUSKY_SKIP_INSTALL=1 npm ci'
             }
         }
     }    
             
     stage('Test') {
-        nodejs() {
-            steps {
+        steps {
+            nodejs(nodeJSInstallationName: 'Node 14.x') {
                 sh 'node test'
             }
         }
