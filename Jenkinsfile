@@ -1,5 +1,7 @@
 pipeline {
-  agent any
+    agent {
+        docker { image 'node:16.13.1-alpine' }
+    }
     
   tools {nodejs "Node 14.x"}
     
