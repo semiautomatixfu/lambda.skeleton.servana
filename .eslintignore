@@ -1,0 +1,9 @@
+# Dependencies
+node_modules
+
+# Generated Code
+src/generated/**/*.ts
+src/generated/**
+
+# Typings
+*.d.ts

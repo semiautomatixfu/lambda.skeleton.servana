@@ -1,0 +1,139 @@
+service: lambda-skeleton-circleci
+
+package:
+  individually: true
+
+plugins:
+  - serverless-webpack
+  - serverless-step-functions
+  - serverless-offline
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  region: ap-southeast-2
+  stage: ${opt:stage}
+  logRetentionInDays: ${self:custom.LogRetentionDays.${opt:stage}, self:custom.LogRetentionDays.other}
+  memorySize: 256
+  timeout: 30
+  versionFunctions: false
+  environment:
+    REGION: ${self:provider.region}
+    STAGE: ${self:provider.stage}
+    ENV: ${env:env, 'dev'}
+    EXAMPLE_ENV_VARIABLE: 5
+  vpc:
+    securityGroupIds:
+      - Ref: LambdaSecurityGroup
+    subnetIds:
+      - ${ssm:${self:custom.InfrastructurePath}/privateSubnetA, ssm:${self:custom.InfrastructureFallbackPath}/privateSubnetA}
+      - ${ssm:${self:custom.InfrastructurePath}/privateSubnetB, ssm:${self:custom.InfrastructureFallbackPath}/privateSubnetB}
+      - ${ssm:${self:custom.InfrastructurePath}/privateSubnetC, ssm:${self:custom.InfrastructureFallbackPath}/privateSubnetC}
+
+  # Example IAM Role statement to a bucket that doesn't exist
+  iamRoleStatements:
+    - Effect: 'Allow'
+      Action:
+        - 's3:GetObject'
+        - 's3:PutObject'
+      Resource:
+        Fn::Join:
+          - ''
+          - - 'arn:aws:s3:::'
+            - ${self:custom.ExampleBucketName}
+            - '/*'
+    - Effect: 'Allow'
+      Action:
+        - 'ssm:GetParameter'
+        - 'ssm:GetParameters'
+        - 'ssm:PutParameters'
+        - 'ssm:PutParameter' # shouldn't really need this, if it is needed, be specific in which resource below can be Put to
+      Resource:
+        - '*'
+
+custom:
+  webpack:
+    includeModules:
+      forceInclude:
+        # Without this the shared library breaks
+        - babel-runtime
+  InfrastructurePath: /${self:provider.stage}/infrastructure
+  InfrastructureFallbackPath: /master/infrastructure
+  ServicesPath: /${self:provider.stage}/services
+  ServicesFallbackPath: /master/services
+
+  VpcId: ${ssm:${self:custom.InfrastructurePath}/vpcId, ssm:${self:custom.InfrastructureFallbackPath}/vpcId}
+
+  StepFunctionNamePrefix: ${self:provider.stage}-${self:service.name}
+  LamdbaFunctionArnPrefix: 'arn:aws:lambda:#{AWS::Region}:#{AWS::AccountId}:function:'
+
+  ExampleHttpFunctionName: ${self:custom.StepFunctionNamePrefix}-exampleHttp
+
+  ExampleStepFunctionName: ${self:custom.StepFunctionNamePrefix}-exampleStep
+  ExampleStepFunctionArn: ${self:custom.LamdbaFunctionArnPrefix}${self:custom.ExampleStepFunctionName}
+
+  ExampleBucketName: lamda-skeleton-example-${self:provider.stage}
+
+  LogRetentionDays:
+    master: 3653
+    other: 14
+
+  SSMParameterExample:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /${self:provider.stage}/services/skeleton/test
+      Type: String
+      Value: testValue
+
+genericPublicLambdaEvent: &idPublicLambdaEvent
+  integration: lambda-proxy
+  method: ANY
+  cors: true
+  private: false
+  
+functions:
+  exampleHttp:
+    name: ${self:custom.ExampleHttpFunctionName}
+    handler: src/functions/exampleHttpFunction.handler
+    description: Example lambda that will do nothing
+    timeout: 15
+    memorySize: 128
+    events:
+      - http:
+          <<: *idPublicLambdaEvent
+          method: ANY
+          path: /example
+      - http:
+          <<: *idPublicLambdaEvent
+          method: ANY
+          path: /example/{proxy+}    
+  exampleStep:
+    name: ${self:custom.ExampleStepFunctionName}
+    handler: src/functions/exampleStepFunction.handler
+    description: Example lambda that will do nothing
+    timeout: 15
+    memorySize: 128
+
+stepFunctions:
+  stateMachines:
+    exampleStateMachine:
+      id: StateMachineExample
+      name: ${self:provider.stage}-${self:service.name}-example
+      definition:
+        Comment: Example
+        StartAt: Example
+        States:
+          Example:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [exampleStep, Arn]
+            End: true
+
+resources:
+  - Description: 'CHANGE ME! This is a description for CloudFormation stack deployed by this Serverless project'
+  - Conditions:
+      IsMaster:
+        Fn::Equals:
+          - ${self:provider.stage}
+          - master
+  - ${file(serverless/lambda.yml)}

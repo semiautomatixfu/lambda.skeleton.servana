@@ -1,0 +1,20 @@
+Resources:
+  IamRoleLambdaExecution: # rename the role given to the lambda. when deploying to dev from a branch then role name is to long without this
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ${self:provider.stage}-${self:service.name}-lambda
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow lambda the lambda to send http/s requests to api.manage
+      VpcId: ${self:custom.VpcId}
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
