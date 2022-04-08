@@ -6,7 +6,7 @@ properties([
     disableConcurrentBuilds() // This limits build concurrency to 1 per branch
 ])
 
-node {
+node('small-agent') {
     checkout scm
     docker.image('node:14-alpine').inside() {
         try {
