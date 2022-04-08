@@ -12,9 +12,9 @@ node('small-agent') {
         try {
             def stageName = "${env.BRANCH_NAME.toLowerCase().replaceAll('-','').replaceAll('/','')}"
 
-            stage('Checkout') {
-                checkout scm
-            }
+            // stage('Checkout') {
+            //     checkout scm
+            // }
 
             stage('Install') {
                 sh "HUSKY_SKIP_INSTALL=1 npm ci"
